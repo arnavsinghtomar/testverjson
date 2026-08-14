@@ -177,3 +177,20 @@ export const auditLog = pgTable('audit_log', {
   entityId: text('entity_id'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
+
+/**
+ * Money returned to a punter. Separate from `payments` because a refund can be
+ * partial, can happen more than once against a single payment, and needs its
+ * own audit trail — collapsing it into a negative payment loses the reason.
+ */
+export const refunds = pgTable('refunds', {
+  id: text('id').primaryKey(),
+  paymentId: text('payment_id').notNull().references((): AnyPgColumn => payments.id),
+  orderId: text('order_id').notNull().references((): AnyPgColumn => orders.id),
+  amountCents: integer('amount_cents').notNull(),
+  /** Free text from the staff member who issued it. */
+  reason: text('reason'),
+  issuedById: text('issued_by_id').references((): AnyPgColumn => users.id),
+  status: text('status').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
