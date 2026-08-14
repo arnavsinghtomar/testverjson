@@ -1,0 +1,161 @@
+/**
+ * Roundhouse database schema.
+ *
+ * Ticketing for independent music venues: venues run events, events sell ticket
+ * types, punters place orders, orders take payments.
+ *
+ * Money is stored in minor units (pence) as integers throughout — never floats.
+ * The API converts at the boundary.
+ */
+
+import {
+  pgTable,
+  text,
+  integer,
+  boolean,
+  timestamp,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
+
+/** Punters and venue staff. One row per person. */
+export const users = pgTable(
+  'users',
+  {
+    id: text('id').primaryKey(),
+    email: text('email').notNull(),
+    passwordHash: text('password_hash').notNull(),
+    displayName: text('display_name').notNull(),
+    phone: text('phone'),
+    /** The event shown on a user's public profile. */
+    featuredEventId: text('featured_event_id'),
+    marketingOptIn: boolean('marketing_opt_in').notNull().default(false),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('users_email_uq').on(t.email)],
+);
+
+/** A physical room that puts on shows. */
+export const venues = pgTable(
+  'venues',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    city: text('city').notNull(),
+    addressLine1: text('address_line1').notNull(),
+    postcode: text('postcode').notNull(),
+    capacity: integer('capacity').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('venues_slug_uq').on(t.slug)],
+);
+
+/** A show at a venue. `doorPriceCents` is the walk-up price. */
+export const events = pgTable(
+  'events',
+  {
+    id: text('id').primaryKey(),
+    venueId: text('venue_id').notNull(),
+    /** Staff member who programmed the show. */
+    curatorId: text('curator_id'),
+    title: text('title').notNull(),
+    slug: text('slug').notNull(),
+    description: text('description'),
+    startsAt: timestamp('starts_at').notNull(),
+    doorPriceCents: integer('door_price_cents').notNull(),
+    status: text('status').notNull(),
+    ageRestriction: integer('age_restriction'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('events_slug_uq').on(t.slug)],
+);
+
+/** Advance, early-bird, guest list — one row per tier on an event. */
+export const ticketTypes = pgTable('ticket_types', {
+  id: text('id').primaryKey(),
+  eventId: text('event_id').notNull(),
+  name: text('name').notNull(),
+  priceCents: integer('price_cents').notNull(),
+  quantity: integer('quantity').notNull(),
+  sold: integer('sold').notNull().default(0),
+});
+
+export const orders = pgTable('orders', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  eventId: text('event_id').notNull(),
+  totalCents: integer('total_cents').notNull(),
+  status: text('status').notNull(),
+  reference: text('reference').notNull(),
+  placedAt: timestamp('placed_at').notNull().defaultNow(),
+});
+
+export const orderItems = pgTable('order_items', {
+  id: text('id').primaryKey(),
+  orderId: text('order_id').notNull(),
+  ticketTypeId: text('ticket_type_id').notNull(),
+  quantity: integer('quantity').notNull(),
+  unitPriceCents: integer('unit_price_cents').notNull(),
+});
+
+/** Card payments, taken through Stripe. Only the last four digits are kept. */
+export const payments = pgTable('payments', {
+  id: text('id').primaryKey(),
+  orderId: text('order_id').notNull(),
+  provider: text('provider').notNull(),
+  providerRef: text('provider_ref'),
+  amountCents: integer('amount_cents').notNull(),
+  cardLast4: text('card_last4'),
+  status: text('status').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+/** Genre tags. `parentId` points at a broader tag, so they nest. */
+export const tags = pgTable(
+  'tags',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    parentId: text('parent_id'),
+  },
+  (t) => [uniqueIndex('tags_slug_uq').on(t.slug)],
+);
+
+/** Many-to-many between events and tags. Nothing but keys. */
+export const eventTags = pgTable('event_tags', {
+  eventId: text('event_id').notNull(),
+  tagId: text('tag_id').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const reviews = pgTable('reviews', {
+  id: text('id').primaryKey(),
+  eventId: text('event_id').notNull(),
+  userId: text('user_id').notNull(),
+  rating: integer('rating').notNull(),
+  body: text('body'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+/** Sign-ups for sold-out shows. Email only — no account required. */
+export const waitlist = pgTable('waitlist', {
+  id: text('id').primaryKey(),
+  eventId: text('event_id').notNull(),
+  email: text('email').notNull(),
+  notified: boolean('notified').notNull().default(false),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+/**
+ * Append-only record of staff actions. Written by a nightly job that does not
+ * live in this repo, so nothing here reads or writes it.
+ */
+export const auditLog = pgTable('audit_log', {
+  id: text('id').primaryKey(),
+  actorId: text('actor_id'),
+  action: text('action').notNull(),
+  entity: text('entity').notNull(),
+  entityId: text('entity_id'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
