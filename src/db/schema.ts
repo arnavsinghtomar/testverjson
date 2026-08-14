@@ -164,6 +164,17 @@ export const promoCodes = pgTable(
   (t) => [uniqueIndex('promo_codes_code_uq').on(t.code)],
 );
 
+/** Photos of a room, shown on the venue page. Lowest position shows first. */
+export const venuePhotos = pgTable('venue_photos', {
+  id: text('id').primaryKey(),
+  venueId: text('venue_id').notNull(),
+  url: text('url').notNull(),
+  caption: text('caption'),
+  credit: text('credit'),
+  position: integer('position').notNull().default(0),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
 /**
  * Append-only record of staff actions. Written by a nightly job that does not
  * live in this repo, so nothing here reads or writes it.
