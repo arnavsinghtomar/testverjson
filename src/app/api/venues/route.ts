@@ -12,7 +12,7 @@ export async function GET() {
       slug: v.slug,
       name: v.name,
       city: v.city,
-      address: `${v.addressLine1}, ${v.city} ${v.postcode}`,
+      address: `${v.addressLine1}, ${v.city}`,
       capacity: v.capacity,
     })),
   });

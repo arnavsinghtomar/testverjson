@@ -43,7 +43,6 @@ export const venues = pgTable(
     slug: text('slug').notNull(),
     city: text('city').notNull(),
     addressLine1: text('address_line1').notNull(),
-    postcode: text('postcode').notNull(),
     capacity: integer('capacity').notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
@@ -85,6 +84,8 @@ export const orders = pgTable('orders', {
   userId: text('user_id').notNull(),
   eventId: text('event_id').notNull(),
   totalCents: integer('total_cents').notNull(),
+  discountCents: integer('discount_cents').notNull().default(0),
+  promoCodeId: text('promo_code_id'),
   status: text('status').notNull(),
   reference: text('reference').notNull(),
   placedAt: timestamp('placed_at').notNull().defaultNow(),
@@ -146,6 +147,22 @@ export const waitlist = pgTable('waitlist', {
   notified: boolean('notified').notNull().default(false),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
+
+/** Discount codes. A venue can run one per event, or a site-wide code. */
+export const promoCodes = pgTable(
+  'promo_codes',
+  {
+    id: text('id').primaryKey(),
+    code: text('code').notNull(),
+    eventId: text('event_id'),
+    percentOff: integer('percent_off').notNull(),
+    maxRedemptions: integer('max_redemptions'),
+    redeemed: integer('redeemed').notNull().default(0),
+    expiresAt: timestamp('expires_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('promo_codes_code_uq').on(t.code)],
+);
 
 /**
  * Append-only record of staff actions. Written by a nightly job that does not

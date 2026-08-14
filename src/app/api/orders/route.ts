@@ -54,6 +54,8 @@ export async function POST(req: NextRequest) {
     userId: userId,
     eventId: input.eventId,
     totalCents: total,
+    discountCents: Math.round(total * (input.percentOff || 0) / 100),
+    promoCodeId: input.promoCodeId || null,
     status: 'pending',
     reference: orderReference(orderId),
     placedAt: new Date(),
