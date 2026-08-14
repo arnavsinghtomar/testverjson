@@ -15,6 +15,7 @@ import {
   boolean,
   timestamp,
   uniqueIndex,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
 /** Punters and venue staff. One row per person. */
@@ -27,7 +28,7 @@ export const users = pgTable(
     displayName: text('display_name').notNull(),
     phone: text('phone'),
     /** The event shown on a user's public profile. */
-    featuredEventId: text('featured_event_id'),
+    featuredEventId: text('featured_event_id').references((): AnyPgColumn => events.id),
     marketingOptIn: boolean('marketing_opt_in').notNull().default(false),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
@@ -54,9 +55,9 @@ export const events = pgTable(
   'events',
   {
     id: text('id').primaryKey(),
-    venueId: text('venue_id').notNull(),
+    venueId: text('venue_id').notNull().references((): AnyPgColumn => venues.id),
     /** Staff member who programmed the show. */
-    curatorId: text('curator_id'),
+    curatorId: text('curator_id').references((): AnyPgColumn => users.id),
     title: text('title').notNull(),
     slug: text('slug').notNull(),
     description: text('description'),
@@ -72,7 +73,7 @@ export const events = pgTable(
 /** Advance, early-bird, guest list — one row per tier on an event. */
 export const ticketTypes = pgTable('ticket_types', {
   id: text('id').primaryKey(),
-  eventId: text('event_id').notNull(),
+  eventId: text('event_id').notNull().references((): AnyPgColumn => events.id),
   name: text('name').notNull(),
   priceCents: integer('price_cents').notNull(),
   quantity: integer('quantity').notNull(),
@@ -81,11 +82,11 @@ export const ticketTypes = pgTable('ticket_types', {
 
 export const orders = pgTable('orders', {
   id: text('id').primaryKey(),
-  userId: text('user_id').notNull(),
-  eventId: text('event_id').notNull(),
+  userId: text('user_id').notNull().references((): AnyPgColumn => users.id),
+  eventId: text('event_id').notNull().references((): AnyPgColumn => events.id),
   totalCents: integer('total_cents').notNull(),
   discountCents: integer('discount_cents').notNull().default(0),
-  promoCodeId: text('promo_code_id'),
+  promoCodeId: text('promo_code_id').references((): AnyPgColumn => promoCodes.id),
   status: text('status').notNull(),
   reference: text('reference').notNull(),
   placedAt: timestamp('placed_at').notNull().defaultNow(),
@@ -93,8 +94,8 @@ export const orders = pgTable('orders', {
 
 export const orderItems = pgTable('order_items', {
   id: text('id').primaryKey(),
-  orderId: text('order_id').notNull(),
-  ticketTypeId: text('ticket_type_id').notNull(),
+  orderId: text('order_id').notNull().references((): AnyPgColumn => orders.id),
+  ticketTypeId: text('ticket_type_id').notNull().references((): AnyPgColumn => ticketTypes.id),
   quantity: integer('quantity').notNull(),
   unitPriceCents: integer('unit_price_cents').notNull(),
 });
@@ -102,7 +103,7 @@ export const orderItems = pgTable('order_items', {
 /** Card payments, taken through Stripe. Only the last four digits are kept. */
 export const payments = pgTable('payments', {
   id: text('id').primaryKey(),
-  orderId: text('order_id').notNull(),
+  orderId: text('order_id').notNull().references((): AnyPgColumn => orders.id),
   provider: text('provider').notNull(),
   providerRef: text('provider_ref'),
   amountCents: integer('amount_cents').notNull(),
@@ -118,22 +119,22 @@ export const tags = pgTable(
     id: text('id').primaryKey(),
     name: text('name').notNull(),
     slug: text('slug').notNull(),
-    parentId: text('parent_id'),
+    parentId: text('parent_id').references((): AnyPgColumn => tags.id),
   },
   (t) => [uniqueIndex('tags_slug_uq').on(t.slug)],
 );
 
 /** Many-to-many between events and tags. Nothing but keys. */
 export const eventTags = pgTable('event_tags', {
-  eventId: text('event_id').notNull(),
-  tagId: text('tag_id').notNull(),
+  eventId: text('event_id').notNull().references((): AnyPgColumn => events.id),
+  tagId: text('tag_id').notNull().references((): AnyPgColumn => tags.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
 export const reviews = pgTable('reviews', {
   id: text('id').primaryKey(),
-  eventId: text('event_id').notNull(),
-  userId: text('user_id').notNull(),
+  eventId: text('event_id').notNull().references((): AnyPgColumn => events.id),
+  userId: text('user_id').notNull().references((): AnyPgColumn => users.id),
   rating: integer('rating').notNull(),
   body: text('body'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -142,7 +143,7 @@ export const reviews = pgTable('reviews', {
 /** Sign-ups for sold-out shows. Email only — no account required. */
 export const waitlist = pgTable('waitlist', {
   id: text('id').primaryKey(),
-  eventId: text('event_id').notNull(),
+  eventId: text('event_id').notNull().references((): AnyPgColumn => events.id),
   email: text('email').notNull(),
   notified: boolean('notified').notNull().default(false),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -154,7 +155,7 @@ export const promoCodes = pgTable(
   {
     id: text('id').primaryKey(),
     code: text('code').notNull(),
-    eventId: text('event_id'),
+    eventId: text('event_id').references((): AnyPgColumn => events.id),
     percentOff: integer('percent_off').notNull(),
     maxRedemptions: integer('max_redemptions'),
     redeemed: integer('redeemed').notNull().default(0),
@@ -170,7 +171,7 @@ export const promoCodes = pgTable(
  */
 export const auditLog = pgTable('audit_log', {
   id: text('id').primaryKey(),
-  actorId: text('actor_id'),
+  actorId: text('actor_id').references((): AnyPgColumn => users.id),
   action: text('action').notNull(),
   entity: text('entity').notNull(),
   entityId: text('entity_id'),
